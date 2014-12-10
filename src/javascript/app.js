@@ -4,22 +4,25 @@ Ext.define('CustomApp', {
     logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
-        {xtype:'container',itemId:'display_box'},
+        {xtype:'container',itemId:'display_box', margin: 10},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
-        this.down('#message_box').update(this.getContext().getUser());
         
-        var m_name = 'Defect',
-        m_fields = ['Name','State'];
-        
-        this._loadAStoreWithAPromise(m_name, m_fields).then({
+        this._loadStories().then({
             scope: this,
             success: function(store){
                 this.down('#display_box').add({
                     xtype: 'rallygrid',
                     store: store,
-                    columnCfgs: m_fields
+                    columnCfgs: [
+                        {dataIndex:'FormattedID',text:'id'}, 
+                        {dataIndex:'Name',text:'Name'},
+                        {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
+                        {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
+                        {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
+                        {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                    ]
                 });
             },
             failure: function(error_message){
@@ -27,19 +30,30 @@ Ext.define('CustomApp', {
             }
         });
     },
-    _loadAStoreWithAPromise: function(model_name, model_fields){
+    _loadStories: function(){
         var deferred = Ext.create('Deft.Deferred');
         
-        var defectStore = Ext.create('Rally.data.wsapi.Store', {
-            model: model_name,
-            fetch: model_fields,
+        var project_oid = this.getContext().getProject().ObjectID;
+        
+        var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+            fetch: ['Name','ObjectID','FormattedID','TaskActualTotal','TaskEstimateTotal','PlanEstimate','TaskRemainingTotal'],
+            filters: [{
+                property: '_TypeHierarchy',
+                value: 'HierarchicalRequirement'
+            },{
+                property: '__At',
+                value: 'current'
+            },{
+                property: '_ProjectHierarchy',
+                value: project_oid
+            }],
             autoLoad: true,
             listeners: {
                 load: function(store, records, successful) {
                     if (successful){
                         deferred.resolve(store);
                     } else {
-                        deferred.reject('Failed to load store for model [' + model_name + '] and fields [' + model_fields.join(',') + ']');
+                        deferred.reject('Failed to load initial Snapshot Store');
                     }
                 }
             }
