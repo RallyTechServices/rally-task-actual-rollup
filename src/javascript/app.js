@@ -4,11 +4,13 @@ Ext.define('CustomApp', {
     logger: new Rally.technicalservices.Logger(),
     calculation_fields: { 'TaskActualTotal': 'Estimate' ,'TaskEstimateTotal':'Actual','TaskRemainingTotal':'To Do'},
     items: [
-        {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
+        {xtype:'container',itemId:'selector_box', margin: 10},
         {xtype:'container',itemId:'display_box', margin: 10},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
+        this.setLoading('Gathering data...');
+        
         this._getPortfolioItemTypes().then({
             scope: this,
             success:function(types) {
@@ -34,10 +36,18 @@ Ext.define('CustomApp', {
                                 for ( var i=this.pi_types.length; i>0; i-- ) {
                                     var sub_columns = [];
                                     var type = this.pi_types[i-1].get('ElementName');
-                                    sub_columns.push({dataIndex:type + "_FormattedID",text: " id", width: 50});
+                                    sub_columns.push({
+                                        dataIndex:type + "_FormattedID",
+                                        text: " id", width: 50,
+                                        csvText: type + " id"
+                                    });
                                     
                                     Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                                        sub_columns.push({dataIndex:type + "_" +calculation_field,text: calculation_header});
+                                        sub_columns.push({
+                                            dataIndex:type + "_" +calculation_field,
+                                            text: calculation_header,
+                                            csvText: type + " " + calculation_header
+                                        });
                                     });
                                     columns.push({ text: type, columns: sub_columns });
                                 }
@@ -53,12 +63,14 @@ Ext.define('CustomApp', {
                                     }
                                 ]);
                                 
-                                this.down('#display_box').add({
+                                var grid = this.down('#display_box').add({
                                     xtype: 'rallygrid',
                                     store: store,
                                     sortableColumns: false,
                                     columnCfgs: columns
                                 });
+                                this._addButton(grid,records); 
+                                this.setLoading(false);
                             },
                             failure: function(error_message) {
                                 alert(error_message);
@@ -76,6 +88,20 @@ Ext.define('CustomApp', {
         });
         
         
+    },
+    _addButton: function(grid,records) {
+        if ( this._isAbleToDownloadFiles() ) {
+            this.down('#selector_box').add({
+                xtype:'rallybutton',
+                itemId:'save_button',
+                text:'Save As CSV',
+                scope: this,
+                handler: function() {
+                    var csv = this._getCSVFromGrid(grid,records);
+                    this._saveCSVToFile(csv,'task-summary.csv',{type:'text/csv;charset=utf-8'});
+                }
+            });
+        }
     },
     _addParentInformation: function(records,parent_field) {
         var deferred = Ext.create('Deft.Deferred');
@@ -127,7 +153,6 @@ Ext.define('CustomApp', {
                         }
                     },this);
                 },this);
-                console.log('---',Ext.clone(item_hash));
                 deferred.resolve(item_hash);
             },
             failure: function(error_message) {
@@ -308,5 +333,51 @@ Ext.define('CustomApp', {
             });
         }
         return story;
+    },
+    _isAbleToDownloadFiles: function() {
+        try { 
+            var isFileSaverSupported = !!new Blob(); 
+        } catch(e){
+            this.logger.log(" NOTE: This browser does not support downloading");
+            return false;
+        }
+        return true;
+    },
+    _getCSVFromGrid:function(grid, records){
+        var columns = grid.columns;
+        var column_names = [];
+        var headers = [];
+        
+        var csv = [];
+
+        this.logger.log('columns:',columns);
+        
+        Ext.Array.each(columns,function(column){
+            if ( column.dataIndex ) {
+                column_names.push(column.dataIndex);
+                if ( column.csvText ) {
+                    headers.push(column.csvText);
+                } else {
+                    headers.push(column.text);
+                }
+            }
+        });
+        
+        this.logger.log("Headers: ", headers);
+        csv.push('"' + headers.join('","') + '"');
+        
+        Ext.Array.each(records,function(record){
+            var node_values = [];
+            Ext.Array.each(column_names,function(column_name){
+                node_values.push(record.get(column_name));
+            },this);
+            csv.push('"' + node_values.join('","') + '"');
+        });
+        
+        return csv.join('\r\n');
+    },
+    _saveCSVToFile:function(csv,file_name,type_object){
+        var blob = new Blob([csv],type_object);
+        saveAs(blob,file_name);
     }
 });
