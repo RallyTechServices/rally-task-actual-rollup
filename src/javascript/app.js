@@ -23,9 +23,11 @@ Ext.define('CustomApp', {
                             success: function(parents) {
                                 records = this._consolidateParentInfoInStories(stories,parents);
                                 
-                                console.log(parents,stories);
+                                var top_type = types[types.length - 1].get('Name');
+                                
                                 var store = Ext.create('Rally.data.custom.Store',{
-                                    data: records
+                                    data: records,
+                                    sorters: [{property: top_type + "_ObjectID"}]
                                 });
 //                                
                                 var columns = [];
