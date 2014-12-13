@@ -23,7 +23,7 @@ Ext.define('CustomApp', {
                         this._addParentInformation(stories,lowest_type.get('ElementName')).then({
                             scope: this,
                             success: function(parents) {
-                                records = this._consolidateParentInfoInStories(stories,parents);
+                                var records = this._consolidateParentInfoInStories(stories,parents);
                                 
                                 var top_type = types[types.length - 1].get('Name');
                                 
@@ -33,6 +33,10 @@ Ext.define('CustomApp', {
                                 });
 //                                
                                 var columns = [];
+                                columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
+                                columns.push( {dataIndex:'program_name', text:'Program' } );
+                                columns.push( {dataIndex:'project_name', text:'Project' } );
+                                
                                 for ( var i=this.pi_types.length; i>0; i-- ) {
                                     var sub_columns = [];
                                     var type = this.pi_types[i-1].get('ElementName');
@@ -52,7 +56,9 @@ Ext.define('CustomApp', {
                                     columns.push({ text: type, columns: sub_columns });
                                 }
                                 Ext.Array.push(columns, [
-                                    { text: "Story", columns: [
+                                    { 
+                                        text: "Story", 
+                                        columns: [
                                             {dataIndex:'FormattedID',text:'id', width: 50}, 
                                             {dataIndex:'Name',text:'Name',width: 200},
                                             {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
@@ -256,7 +262,9 @@ Ext.define('CustomApp', {
         var deferred = Ext.create('Deft.Deferred');
         
         var store = Ext.create('Rally.data.wsapi.Store', {
-            fetch: ['Name','ObjectID','FormattedID','TaskActualTotal','TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field],
+            fetch: ['Name','ObjectID','FormattedID','TaskActualTotal',
+                'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
+                'Project','Workspace','Parent'],
             model: 'HierarchicalRequirement',
             filters: [{
                 property: 'DirectChildrenCount',
@@ -266,6 +274,16 @@ Ext.define('CustomApp', {
             listeners: {
                 load: function(store, records, successful) {
                     if (successful){
+                        Ext.Array.each(records,function(record){
+                            
+                            record.set('workspace_name', record.get('Workspace').Name);
+                            record.set('project_name', record.get('Project').Name);
+                            var program_name = '--';
+                            if ( record.get('Project').Parent) {
+                                record.set('program_name', record.get('Project').Parent.Name);
+                            }
+                            console.log(record);
+                        });
                         deferred.resolve(records);
                     } else {
                         deferred.reject('Failed to load initial Snapshot Store');
