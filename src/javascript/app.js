@@ -2,7 +2,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-    calculation_fields: ['TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'],
+    calculation_fields: { 'TaskActualTotal': 'Estimate' ,'TaskEstimateTotal':'Actual','TaskRemainingTotal':'To Do'},
     items: [
         {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
         {xtype:'container',itemId:'display_box', margin: 10},
@@ -30,24 +30,31 @@ Ext.define('CustomApp', {
 //                                
                                 var columns = [];
                                 for ( var i=this.pi_types.length; i>0; i-- ) {
+                                    var sub_columns = [];
                                     var type = this.pi_types[i-1].get('ElementName');
-                                    columns.push({dataIndex:type + "_FormattedID",text: type + " id"});
-                                    Ext.Array.each(this.calculation_fields,function(calculation_field){
-                                        columns.push({dataIndex:type + "_" +calculation_field,text: calculation_field});
+                                    sub_columns.push({dataIndex:type + "_FormattedID",text: " id", width: 50});
+                                    
+                                    Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                                        sub_columns.push({dataIndex:type + "_" +calculation_field,text: calculation_header});
                                     });
+                                    columns.push({ text: type, columns: sub_columns });
                                 }
                                 Ext.Array.push(columns, [
-                                    {dataIndex:'FormattedID',text:'id'}, 
-                                    {dataIndex:'Name',text:'Name'},
-                                    {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
-                                    {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
-                                    {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
-                                    {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                                    { text: "Story", columns: [
+                                            {dataIndex:'FormattedID',text:'id', width: 50}, 
+                                            {dataIndex:'Name',text:'Name',width: 200},
+                                            {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
+                                            {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
+                                            {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
+                                            {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                                        ]
+                                    }
                                 ]);
                                 
                                 this.down('#display_box').add({
                                     xtype: 'rallygrid',
                                     store: store,
+                                    sortableColumns: false,
                                     columnCfgs: columns
                                 });
                             },
@@ -95,7 +102,7 @@ Ext.define('CustomApp', {
                     var parent_link = child.get(parent_field);
                     if ( parent_link ) {
                         var parent = item_hash[parent_link.ObjectID];
-                        Ext.Array.each(this.calculation_fields,function(calculation_field){
+                        Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                             var parent_value = parent.get(calculation_field) || 0;
                             var child_value = child.get(calculation_field) || 0;
                             parent.set(calculation_field,parent_value+child_value);
@@ -109,7 +116,7 @@ Ext.define('CustomApp', {
                             var parent_link = child.get('Parent');
                             if ( parent_link ) {
                                 var parent = item_hash[parent_link.ObjectID];
-                                Ext.Array.each(this.calculation_fields,function(calculation_field){
+                                Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                                     var parent_value = parent.get(calculation_field) || 0;
                                     var child_value = child.get(calculation_field) || 0;
                                     parent.set(calculation_field,parent_value+child_value);
@@ -259,7 +266,7 @@ Ext.define('CustomApp', {
                 story.set(lowest_type + "_FormattedID", parent.get('FormattedID'));
                 story.set(lowest_type + "_ObjectID", parent.get('ObjectID'));
                 
-                Ext.Array.each(this.calculation_fields,function(calculation_field){
+                Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                     var parent_value = parent.get(calculation_field) || 0;
                     story.set(lowest_type + "_" + calculation_field,parent_value);
                 });
@@ -273,7 +280,7 @@ Ext.define('CustomApp', {
                         story.set(type + "_FormattedID", parent.get('FormattedID'));
                         story.set(type + "_ObjectID", parent.get('ObjectID'));
                         
-                        Ext.Array.each(this.calculation_fields,function(calculation_field){
+                        Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                             var parent_value = parent.get(calculation_field) || 0;
                             story.set(type + "_" + calculation_field,parent_value);
                         });
@@ -294,7 +301,7 @@ Ext.define('CustomApp', {
             var type = this.pi_types[i].get('ElementName');
             story.set(type + "_FormattedID","");
             story.set(type + "_ObjectID","");
-            Ext.Array.each(this.calculation_fields,function(calculation_field){
+            Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                 story.set(type + "_" + calculation_field,"");
             });
         }
