@@ -2,7 +2,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-    calculation_fields: { 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
+    calculation_fields: { 'PlanEstimate': 'Plan Estimate', 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
     items: [
         {xtype:'container',itemId:'selector_box', margin: 10},
         {xtype:'container',itemId:'display_box', margin: 10},

@@ -3,10 +3,10 @@
 <head>
     <title>Task Actual Rollup</title>
     <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Dec 22 2014 11:00:29 GMT-0800 (PST) -->
+    <!--  Build Date: Mon Dec 22 2014 15:18:06 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Dec 22 2014 11:00:29 GMT-0800 (PST)";
+        var APP_BUILD_DATE = "Mon Dec 22 2014 15:18:06 GMT-0800 (PST)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -562,7 +562,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-    calculation_fields: { 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
+    calculation_fields: { 'PlanEstimate': 'Plan Estimate', 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
     items: [
         {xtype:'container',itemId:'selector_box', margin: 10},
         {xtype:'container',itemId:'display_box', margin: 10},
