@@ -2,7 +2,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-    calculation_fields: { 'TaskActualTotal': 'Estimate' ,'TaskEstimateTotal':'Actual','TaskRemainingTotal':'To Do'},
+    calculation_fields: { 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
     items: [
         {xtype:'container',itemId:'selector_box', margin: 10},
         {xtype:'container',itemId:'display_box', margin: 10},
@@ -144,17 +144,24 @@ Ext.define('CustomApp', {
                     }
                 },this);
                 // cycle through parent types to roll up data
+                this.logger.log("pi types:", this.pi_types);
                 Ext.Array.each(this.pi_types, function(pi_type) {
+                    this.logger.log('pi type:', pi_type);
                     Ext.Object.each(item_hash, function(key,child){
+                        this.logger.log('key,value', key, child);
                         if ( Ext.util.Format.lowercase(pi_type.get('TypePath') ) == child.get('_type') ){
                             var parent_link = child.get('Parent');
                             if ( parent_link ) {
                                 var parent = item_hash[parent_link.ObjectID];
-                                Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                                    var parent_value = parent.get(calculation_field) || 0;
-                                    var child_value = child.get(calculation_field) || 0;
-                                    parent.set(calculation_field,parent_value+child_value);
-                                });
+                                if ( parent ) {
+                                    this.logger.log('calc fields:',this.calculation_fields);
+                                    this.logger.log('parent: ', parent);
+                                    Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                                        var parent_value = parent.get(calculation_field) || 0;
+                                        var child_value = child.get(calculation_field) || 0;
+                                        parent.set(calculation_field,parent_value+child_value);
+                                    },this);
+                                }
                             }
                         }
                     },this);
@@ -282,7 +289,6 @@ Ext.define('CustomApp', {
                             if ( record.get('Project').Parent) {
                                 record.set('program_name', record.get('Project').Parent.Name);
                             }
-                            console.log(record);
                         });
                         deferred.resolve(records);
                     } else {
@@ -322,13 +328,15 @@ Ext.define('CustomApp', {
                     if ( parent_link ) {
                         parent_oid = parent_link.ObjectID;
                         parent = parents[parent_oid];
-                        story.set(type + "_FormattedID", parent.get('FormattedID'));
-                        story.set(type + "_ObjectID", parent.get('ObjectID'));
-                        
-                        Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                            var parent_value = parent.get(calculation_field) || 0;
-                            story.set(type + "_" + calculation_field,parent_value);
-                        });
+                        if ( parent ) {
+                            story.set(type + "_FormattedID", parent.get('FormattedID'));
+                            story.set(type + "_ObjectID", parent.get('ObjectID'));
+                            
+                            Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                                var parent_value = parent.get(calculation_field) || 0;
+                                story.set(type + "_" + calculation_field,parent_value);
+                            });
+                        }
                     }
                     last_parent = parent;
                 }
