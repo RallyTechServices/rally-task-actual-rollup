@@ -45,7 +45,11 @@ Ext.define('CustomApp', {
                                         text: " id", width: 50,
                                         csvText: type + " id"
                                     });
-                                    
+                                    sub_columns.push({
+                                        dataIndex:type + "_Name",
+                                        text: "Name", width: 150,
+                                        csvText: type + " Name"
+                                    });
                                     Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                                         sub_columns.push({
                                             dataIndex:type + "_" +calculation_field,
@@ -316,6 +320,7 @@ Ext.define('CustomApp', {
                 var parent = parents[parent_oid];
                 story.set(lowest_type + "_FormattedID", parent.get('FormattedID'));
                 story.set(lowest_type + "_ObjectID", parent.get('ObjectID'));
+                story.set(lowest_type + "_Name", parent.get('Name'));
                 
                 Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                     var parent_value = parent.get(calculation_field) || 0;
@@ -331,6 +336,7 @@ Ext.define('CustomApp', {
                         if ( parent ) {
                             story.set(type + "_FormattedID", parent.get('FormattedID'));
                             story.set(type + "_ObjectID", parent.get('ObjectID'));
+                            story.set(type + "_Name", parent.get('Name'));
                             
                             Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                                 var parent_value = parent.get(calculation_field) || 0;
