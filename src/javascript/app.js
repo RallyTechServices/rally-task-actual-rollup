@@ -4,13 +4,19 @@ Ext.define('CustomApp', {
     logger: new Rally.technicalservices.Logger(),
     calculation_fields: { 'PlanEstimate': 'Plan Estimate', 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
     items: [
-        {xtype:'container',itemId:'selector_box', margin: 10},
+        {xtype:'container', defaults: { margin: 10 },itemId:'selector_box', layout: { type: 'hbox'} },
         {xtype:'container',itemId:'display_box', margin: 10},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
+         if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());  
+        }
+    },
+    _recalculate: function() {
         this.setLoading('Gathering data...');
-        
         this._getPortfolioItemTypes().then({
             scope: this,
             success:function(types) {
@@ -59,19 +65,36 @@ Ext.define('CustomApp', {
                                     });
                                     columns.push({ text: type, columns: sub_columns });
                                 }
+                                
+                                var story_columns = [
+                                    {dataIndex:'FormattedID',text:'id', width: 50}, 
+                                    {dataIndex:'Name',text:'Name',width: 200},
+                                    {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
+                                    {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
+                                    {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
+                                    {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                                ];
+                                
+                                var additional_story_fields = this.getSetting('additional_fields') || [];
+                                var additional_story_fields = this.getSetting('additional_fields') || [];
+                                if( typeof additional_story_fields === 'string' ) {
+                                    additional_story_fields = additional_story_fields.split(',');
+                                }
+                                Ext.Array.each(additional_story_fields,function(additional_field){
+                                    story_columns.push({
+                                        dataIndex: additional_field,
+                                        text: this._getDisplayFromFieldName(additional_field)
+                                    });
+                                },this);
+                                
                                 Ext.Array.push(columns, [
                                     { 
                                         text: "Story", 
-                                        columns: [
-                                            {dataIndex:'FormattedID',text:'id', width: 50}, 
-                                            {dataIndex:'Name',text:'Name',width: 200},
-                                            {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
-                                            {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
-                                            {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
-                                            {dataIndex: 'TaskRemainingTotal', text:'To Do'}
-                                        ]
+                                        columns: story_columns
                                     }
                                 ]);
+                                
+
                                 
                                 var grid = this.down('#display_box').add({
                                     xtype: 'rallygrid',
@@ -98,6 +121,12 @@ Ext.define('CustomApp', {
         });
         
         
+    },
+    _getDisplayFromFieldName:function(field_name) {
+        var stripped_c = field_name.replace(/^c_/,"");
+        var display_array = stripped_c.split(/(?=[A-Z])/);
+        
+        return display_array.join(' ');
     },
     _addButton: function(grid,records) {
         if ( this._isAbleToDownloadFiles() ) {
@@ -197,8 +226,13 @@ Ext.define('CustomApp', {
             filters = filters.or(Ext.create('Rally.data.wsapi.Filter',{property:'ObjectID',value:parent_oids[i]}));
         }
         
+        var fetch = ['Name','ObjectID','FormattedID','Parent'];
+        
+        var additional_story_fields = this.getSetting('additional_fields') || [];
+        Ext.Array.push(fetch,additional_story_fields);
+        
         Ext.create('Rally.data.wsapi.Store', {
-            fetch: ['Name','ObjectID','FormattedID','Parent'],
+            fetch: fetch,
             filters: filters,
             autoLoad: true,
             model: parent_type,
@@ -272,10 +306,18 @@ Ext.define('CustomApp', {
     _loadStories: function(pi_field){
         var deferred = Ext.create('Deft.Deferred');
         
+        var fetch = ['Name','ObjectID','FormattedID','TaskActualTotal',
+            'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
+            'Project','Workspace','Parent'];
+        
+        var additional_story_fields = this.getSetting('additional_fields') || [];
+        if( typeof additional_story_fields === 'string' ) {
+            additional_story_fields = additional_story_fields.split(',');
+        }
+        Ext.Array.push(fetch,additional_story_fields);
+        
         var store = Ext.create('Rally.data.wsapi.Store', {
-            fetch: ['Name','ObjectID','FormattedID','TaskActualTotal',
-                'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
-                'Project','Workspace','Parent'],
+            fetch: fetch,
             model: 'HierarchicalRequirement',
             filters: [{
                 property: 'DirectChildrenCount',
@@ -411,5 +453,88 @@ Ext.define('CustomApp', {
     _saveCSVToFile:function(csv,file_name,type_object){
         var blob = new Blob([csv],type_object);
         saveAs(blob,file_name);
+    },
+    /********************************************
+    /* Overrides for App class
+    /*
+    /********************************************/
+    _ignoreTextFields: function(field) {
+        var should_show_field = true;
+        var forbidden_fields = ['FormattedID','ObjectID','DragAndDropRank','Name',
+            'PlanEstimate','TaskActualTotal','TaskEstimateTotal','TaskRemainingTotal'];
+        if ( field.hidden ) {
+            should_show_field = false;
+        }
+        
+        if ( field.attributeDefinition ) {
+            
+            var type = field.attributeDefinition.AttributeType;
+            if ( type == "TEXT" || type == "OBJECT" || type == "COLLECTION" ) {
+                should_show_field = false;
+            }
+            if ( Ext.Array.indexOf(forbidden_fields,field.name) > -1 ) {
+                should_show_field = false;
+            }
+        } else {
+            should_show_field = false;
+        }
+        return should_show_field;
+    },
+    //getSettingsFields:  Override for App    
+    getSettingsFields: function() {
+        var me = this;
+        
+        return [{
+            name: 'additional_fields',
+            xtype: 'rallyfieldpicker',
+            modelTypes: ['HierarchicalRequirement'],
+            fieldLabel: 'Additional Columns for User Stories:',
+            _shouldShowField: me._ignoreTextFields,
+            width: 300,
+            labelWidth: 150,
+            listeners: {
+                ready: function(picker){ picker.collapse(); }
+            },
+            readyEvent: 'ready' //event fired to signify readiness
+        }];
+    },
+    //showSettings:  Override to add showing when external + scrolling
+    showSettings: function(options) {
+        this.logger.log("showSettings",options);
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        
+        if (this.isExternal()){
+            if (this.down('#display_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#display_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        this.logger.log('_onSettingsSaved',settings);
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        //Build and save column settings...this means that we need to get the display names and multi-list
+        this.logger.log('onSettingsUpdate',settings);        
+        this._recalculate();
+    },
+    isExternal: function(){
+      return typeof(this.getAppId()) == 'undefined';
     }
 });
