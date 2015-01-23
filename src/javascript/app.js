@@ -33,11 +33,22 @@ Ext.define('CustomApp', {
                                 
                                 var top_type = types[types.length - 1].get('Name');
                                 
+                                var sorters = [];
+                                for ( var i=this.pi_types.length; i>0; i-- ) {
+                                    var type = this.pi_types[i-1].get('ElementName');
+                                    sorters.push({property: type + "_ObjectID" });
+                                }
+                                
+                                sorters.push({property:'ObjectID'});
+                                
+                                this.logger.log("sorters: ",sorters);
+                                
                                 var store = Ext.create('Rally.data.custom.Store',{
                                     data: records,
-                                    sorters: [{property: top_type + "_ObjectID"}]
+                                    sorters: sorters
                                 });
-//                                
+                                this.logger.log("store: ",store);
+                                
                                 var columns = [];
                                 columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
                                 columns.push( {dataIndex:'program_name', text:'Program' } );

@@ -3,10 +3,10 @@
 <head>
     <title>Task Actual Rollup</title>
     <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Dec 22 2014 18:51:21 GMT-0800 (PST) -->
+    <!--  Build Date: Fri Jan 23 2015 10:07:23 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Dec 22 2014 18:51:21 GMT-0800 (PST)";
+        var APP_BUILD_DATE = "Fri Jan 23 2015 10:07:23 GMT-0800 (PST)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -593,11 +593,22 @@ Ext.define('CustomApp', {
                                 
                                 var top_type = types[types.length - 1].get('Name');
                                 
+                                var sorters = [];
+                                for ( var i=this.pi_types.length; i>0; i-- ) {
+                                    var type = this.pi_types[i-1].get('ElementName');
+                                    sorters.push({property: type + "_ObjectID" });
+                                }
+                                
+                                sorters.push({property:'ObjectID'});
+                                
+                                this.logger.log("sorters: ",sorters);
+                                
                                 var store = Ext.create('Rally.data.custom.Store',{
                                     data: records,
-                                    sorters: [{property: top_type + "_ObjectID"}]
+                                    sorters: sorters
                                 });
-//                                
+                                this.logger.log("store: ",store);
+                                
                                 var columns = [];
                                 columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
                                 columns.push( {dataIndex:'program_name', text:'Program' } );
