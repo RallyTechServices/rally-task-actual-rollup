@@ -113,7 +113,7 @@ Ext.define('CustomApp', {
                                     sortableColumns: false,
                                     columnCfgs: columns
                                 });
-                                this._addButton(grid,records); 
+                                this._addButton(grid,store); 
                                 this.setLoading(false);
                             },
                             failure: function(error_message) {
@@ -139,7 +139,7 @@ Ext.define('CustomApp', {
         
         return display_array.join(' ');
     },
-    _addButton: function(grid,records) {
+    _addButton: function(grid,store) {
         if ( this._isAbleToDownloadFiles() ) {
             this.down('#selector_box').add({
                 xtype:'rallybutton',
@@ -147,8 +147,12 @@ Ext.define('CustomApp', {
                 text:'Save As CSV',
                 scope: this,
                 handler: function() {
-                    var csv = this._getCSVFromGrid(grid,records);
-                    this._saveCSVToFile(csv,'task-summary.csv',{type:'text/csv;charset=utf-8'});
+                    this._getCSVFromGrid(grid,store).then({
+                        scope: this,
+                        success: function(csv) {
+                            this._saveCSVToFile(csv,'task-summary.csv',{type:'text/csv;charset=utf-8'});
+                        }
+                    });
                 }
             });
         }
@@ -428,14 +432,14 @@ Ext.define('CustomApp', {
         }
         return true;
     },
-    _getCSVFromGrid:function(grid, records){
+    _getCSVFromGrid:function(grid, store){
+        var deferred = Ext.create('Deft.Deferred');
+        
         var columns = grid.columns;
         var column_names = [];
         var headers = [];
         
         var csv = [];
-
-        this.logger.log('columns:',columns);
         
         Ext.Array.each(columns,function(column){
             if ( column.dataIndex ) {
@@ -448,18 +452,32 @@ Ext.define('CustomApp', {
             }
         });
         
-        this.logger.log("Headers: ", headers);
         csv.push('"' + headers.join('","') + '"');
         
-        Ext.Array.each(records,function(record){
-            var node_values = [];
-            Ext.Array.each(column_names,function(column_name){
-                node_values.push(record.get(column_name));
-            },this);
-            csv.push('"' + node_values.join('","') + '"');
+        var store_clone = Ext.clone(store);
+        store_clone.pageSize = 10000;
+        
+        store_clone.load({ 
+            scope: this,
+            callback: function(records) {
+                var number_of_records = store_clone.getTotalCount();
+                                                
+                for ( var i=0; i<number_of_records; i++ ) {
+                    var record = store_clone.getAt(i);
+                    this.logger.log(i,record);
+                    var node_values = [];
+                    Ext.Array.each(column_names,function(column_name){
+                        node_values.push(record.get(column_name));
+                    },this);
+                    csv.push('"' + node_values.join('","') + '"');
+                }  
+                
+                deferred.resolve( csv.join('\r\n') );
+            }
         });
         
-        return csv.join('\r\n');
+        return deferred.promise;
+        
     },
     _saveCSVToFile:function(csv,file_name,type_object){
         var blob = new Blob([csv],type_object);
