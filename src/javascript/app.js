@@ -47,7 +47,11 @@ Ext.define('CustomApp', {
                                     data: records,
                                     sorters: sorters
                                 });
-                                this.logger.log("store: ",store);
+                                
+                                var shadow_store = Ext.create('Rally.data.custom.Store',{
+                                    data: records,
+                                    sorters: sorters
+                                });
                                 
                                 var columns = [];
                                 columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
@@ -113,7 +117,8 @@ Ext.define('CustomApp', {
                                     sortableColumns: false,
                                     columnCfgs: columns
                                 });
-                                this._addButton(grid,store); 
+                                
+                                this._addButton(grid,shadow_store); 
                                 this.setLoading(false);
                             },
                             failure: function(error_message) {
@@ -291,7 +296,6 @@ Ext.define('CustomApp', {
         var store = Ext.create('Rally.data.wsapi.Store', {
             fetch: ['Name','ElementName','TypePath'],
             model: 'TypeDefinition',
-            limit: 'Infinity',
             filters: [
                 {
                     property: 'Parent.Name',
@@ -338,6 +342,7 @@ Ext.define('CustomApp', {
                 property: 'DirectChildrenCount',
                 value: 0
             }],
+            limit: 'Infinity',
             autoLoad: true,
             listeners: {
                 load: function(store, records, successful) {
@@ -435,6 +440,8 @@ Ext.define('CustomApp', {
     _getCSVFromGrid:function(grid, store){
         var deferred = Ext.create('Deft.Deferred');
         
+        this.setLoading(true);
+        
         var columns = grid.columns;
         var column_names = [];
         var headers = [];
@@ -454,23 +461,22 @@ Ext.define('CustomApp', {
         
         csv.push('"' + headers.join('","') + '"');
         
-        var store_clone = Ext.clone(store);
-        store_clone.pageSize = 10000;
+        store.pageSize = 10000;
         
-        store_clone.load({ 
+        store.load({ 
             scope: this,
             callback: function(records) {
-                var number_of_records = store_clone.getTotalCount();
+                var number_of_records = store.getTotalCount();
                                                 
                 for ( var i=0; i<number_of_records; i++ ) {
-                    var record = store_clone.getAt(i);
-                    this.logger.log(i,record);
+                    var record = store.getAt(i);
                     var node_values = [];
                     Ext.Array.each(column_names,function(column_name){
                         node_values.push(record.get(column_name));
                     },this);
                     csv.push('"' + node_values.join('","') + '"');
                 }  
+                this.setLoading(false);
                 
                 deferred.resolve( csv.join('\r\n') );
             }
