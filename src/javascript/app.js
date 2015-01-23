@@ -84,6 +84,13 @@ Ext.define('CustomApp', {
                                 var story_columns = [
                                     {dataIndex:'FormattedID',text:'id', width: 50}, 
                                     {dataIndex:'Name',text:'Name',width: 200},
+                                    {dataIndex:'Iteration',text:'Iteration',renderer: function(value){
+                                        var display_value = "Backlog";
+                                        if ( value ) { 
+                                            display_value = value.Name;
+                                        }
+                                        return display_value;
+                                    },width: 200},
                                     {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
                                     {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
                                     {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
@@ -327,7 +334,7 @@ Ext.define('CustomApp', {
         
         var fetch = ['Name','ObjectID','FormattedID','TaskActualTotal',
             'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
-            'Project','Workspace','Parent'];
+            'Project','Workspace','Parent','Iteration'];
         
         var additional_story_fields = this.getSetting('additional_fields') || [];
         if( typeof additional_story_fields === 'string' ) {
@@ -471,8 +478,15 @@ Ext.define('CustomApp', {
                 for ( var i=0; i<number_of_records; i++ ) {
                     var record = store.getAt(i);
                     var node_values = [];
-                    Ext.Array.each(column_names,function(column_name){
-                        node_values.push(record.get(column_name));
+                    Ext.Array.each(columns,function(column){
+                        if ( column.dataIndex) {
+                            var column_name = column.dataIndex;
+                            var display_value = record.get(column_name);
+                            if ( column.renderer ) {
+                                display_value = column.renderer(display_value);
+                            }
+                            node_values.push(display_value);
+                        }
                     },this);
                     csv.push('"' + node_values.join('","') + '"');
                 }  
