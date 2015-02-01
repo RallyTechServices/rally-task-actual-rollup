@@ -16,7 +16,7 @@ Ext.define('CustomApp', {
         }
     },
     _recalculate: function() {
-        this.setLoading('Gathering data...');
+        this.setLoading('Loading Stories...');
         this._getPortfolioItemTypes().then({
             scope: this,
             success:function(types) {
@@ -26,9 +26,13 @@ Ext.define('CustomApp', {
                 this._loadStories(lowest_type.get('ElementName')).then({
                     scope: this,
                     success: function(stories){
+                        this.setLoading('Loading Parents...');
+
                         this._addParentInformation(stories,lowest_type.get('ElementName')).then({
                             scope: this,
                             success: function(parents) {
+                                this.setLoading('Arranging Data...');
+
                                 var records = this._consolidateParentInfoInStories(stories,parents);
                                 
                                 var top_type = types[types.length - 1].get('Name');
@@ -129,21 +133,28 @@ Ext.define('CustomApp', {
                                 this.setLoading(false);
                             },
                             failure: function(error_message) {
-                                alert(error_message);
+                                this._showFailure(error_message);
                             }
                         });
                     },
                     failure: function(error_message){
-                        alert(error_message);
+                        this._showFailure(error_message);
                     }
                 });
             },
             failure: function(msg) {
-                alert(msg);
+                this._showFailure(msg);
             }
         });
         
         
+    },
+    _showFailure: function(message) {
+        alert(message);
+        this.down('#display_box').add({
+            xtype:'container', html: message
+        });
+        this.setLoading(false);
     },
     _getDisplayFromFieldName:function(field_name) {
         var stripped_c = field_name.replace(/^c_/,"");
@@ -262,39 +273,39 @@ Ext.define('CustomApp', {
             fetch: fetch,
             filters: filters,
             autoLoad: true,
-            model: parent_type,
-            listeners: {
+            enablePostGet: true,
+            model: parent_type
+        }).load().then({
                 scope: this,
-                load: function(store, records, successful) {
-                    if (successful){
-                        var grand_parent_oids = [];
-                        Ext.Array.each(records, function(record){
-                            if ( record.get('Parent')) {
-                                var grand_parent_oid = record.get('Parent').ObjectID;
-                                if ( grand_parent_oid ) {
-                                    grand_parent_oids = Ext.Array.merge(grand_parent_oids,[grand_parent_oid]); 
-                                }
+                success: function(records) {
+                    console.log("--", records);
+                    var grand_parent_oids = [];
+                    Ext.Array.each(records, function(record){
+                        if ( record.get('Parent')) {
+                            var grand_parent_oid = record.get('Parent').ObjectID;
+                            if ( grand_parent_oid ) {
+                                grand_parent_oids = Ext.Array.merge(grand_parent_oids,[grand_parent_oid]); 
+                            }
+                        }
+                    });
+                    if ( grand_parent_oids.length > 0 ) {
+                        this._loadItemsByObjectID(grand_parent_oids,this._getParentTypeFor(parent_type),Ext.Array.merge(records,children)).then({
+                            scope: this,
+                            success: function(parents) {
+                                deferred.resolve(parents);
+                            },
+                            failure: function(msg) {
+                                deferred.reject(msg);
                             }
                         });
-                        if ( grand_parent_oids.length > 0 ) {
-                            this._loadItemsByObjectID(grand_parent_oids,this._getParentTypeFor(parent_type),Ext.Array.merge(records,children)).then({
-                                scope: this,
-                                success: function(parents) {
-                                    deferred.resolve(parents);
-                                },
-                                failure: function(msg) {
-                                    deferred.reject(msg);
-                                }
-                            });
-                        } else {
-                            deferred.resolve(Ext.Array.merge(records,children));
-                        }
                     } else {
-                        deferred.reject('Failed to load parents');
+                        deferred.resolve(Ext.Array.merge(records,children));
                     }
+                },
+                failure: function(rejection) {
+                    deferred.reject("Failure while loading parents:\r\n" + rejection.error.errors.join('\r\n') + ": " + parent_oids.length);
                 }
-            }
-        });
+            });
         return deferred.promise;
     },
     _getPortfolioItemTypes: function() {
