@@ -21,133 +21,116 @@ Ext.define('CustomApp', {
             scope: this,
             success:function(types) {
                 this.pi_types = types;
-                var lowest_type = types[0];
-                
-                this._loadStories(lowest_type.get('ElementName')).then({
+                Deft.Chain.pipeline([
+                    this._loadPIsWithoutStories,
+                    this._loadStories,
+                    this._addParentInformation
+                ]).then({
                     scope: this,
-                    success: function(stories){
-                        this.setLoading('Loading Parents...');
-
-                        this._addParentInformation(stories,lowest_type.get('ElementName')).then({
-                            scope: this,
-                            success: function(parents) {
-                                this.setLoading('Arranging Data...');
-
-                                var records = this._consolidateParentInfoInStories(stories,parents);
-                                
-                                var top_type = types[types.length - 1].get('Name');
-                                
-                                var sorters = [];
-                                for ( var i=this.pi_types.length; i>0; i-- ) {
-                                    var type = this.pi_types[i-1].get('ElementName');
-                                    sorters.push({property: type + "_ObjectID" });
-                                }
-                                
-                                sorters.push({property:'ObjectID'});
-                                
-                                this.logger.log("sorters: ",sorters);
-                                
-                                var store = Ext.create('Rally.data.custom.Store',{
-                                    data: records,
-                                    sorters: sorters
-                                });
-                                
-                                var shadow_store = Ext.create('Rally.data.custom.Store',{
-                                    data: records,
-                                    sorters: sorters
-                                });
-                                
-                                var columns = [];
-                                columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
-                                columns.push( {dataIndex:'program_name', text:'Program' } );
-                                columns.push( {dataIndex:'project_name', text:'Project' } );
-                                
-                                for ( var i=this.pi_types.length; i>0; i-- ) {
-                                    var sub_columns = [];
-                                    var type = this.pi_types[i-1].get('ElementName');
-                                    sub_columns.push({
-                                        dataIndex:type + "_FormattedID",
-                                        text: " id", width: 50,
-                                        csvText: type + " id"
-                                    });
-                                    sub_columns.push({
-                                        dataIndex:type + "_Name",
-                                        text: "Name", width: 150,
-                                        csvText: type + " Name"
-                                    });
-                                    Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                                        sub_columns.push({
-                                            dataIndex:type + "_" +calculation_field,
-                                            text: calculation_header,
-                                            csvText: type + " " + calculation_header
-                                        });
-                                    });
-                                    columns.push({ text: type, columns: sub_columns });
-                                }
-                                
-                                var story_columns = [
-                                    {dataIndex:'FormattedID',text:'id', width: 50}, 
-                                    {dataIndex:'Name',text:'Name',width: 200},
-                                    {dataIndex:'Iteration',text:'Iteration',renderer: function(value){
-                                        var display_value = "Backlog";
-                                        if ( value ) { 
-                                            display_value = value.Name;
-                                        }
-                                        return display_value;
-                                    },width: 200},
-                                    {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
-                                    {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
-                                    {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
-                                    {dataIndex: 'TaskRemainingTotal', text:'To Do'}
-                                ];
-                                
-                                var additional_story_fields = this.getSetting('additional_fields') || [];
-                                var additional_story_fields = this.getSetting('additional_fields') || [];
-                                if( typeof additional_story_fields === 'string' ) {
-                                    additional_story_fields = additional_story_fields.split(',');
-                                }
-                                Ext.Array.each(additional_story_fields,function(additional_field){
-                                    story_columns.push({
-                                        dataIndex: additional_field,
-                                        text: this._getDisplayFromFieldName(additional_field)
-                                    });
-                                },this);
-                                
-                                Ext.Array.push(columns, [
-                                    { 
-                                        text: "Story", 
-                                        columns: story_columns
-                                    }
-                                ]);
-                                
-
-                                
-                                var grid = this.down('#display_box').add({
-                                    xtype: 'rallygrid',
-                                    store: store,
-                                    sortableColumns: false,
-                                    columnCfgs: columns
-                                });
-                                
-                                this._addButton(grid,shadow_store); 
-                                this.setLoading(false);
-                            },
-                            failure: function(error_message) {
-                                this._showFailure(error_message);
-                            }
+                    success: function(records) {
+                        this.setLoading('Arranging Data...');
+                        
+                        var top_type = types[types.length - 1].get('Name');
+                        
+                        var sorters = [];
+                        for ( var i=this.pi_types.length; i>0; i-- ) {
+                            var type = this.pi_types[i-1].get('ElementName');
+                            sorters.push({property: type + "_ObjectID" });
+                        }
+                        
+                        sorters.push({property:'ObjectID'});
+                                                
+                        var store = Ext.create('Rally.data.custom.Store',{
+                            data: records,
+                            sorters: sorters
                         });
+                        
+                        var shadow_store = Ext.create('Rally.data.custom.Store',{
+                            data: records,
+                            sorters: sorters
+                        });
+                        
+                        var columns = [];
+                        columns.push( {dataIndex:'workspace_name', text:'Workspace' } );
+                        columns.push( {dataIndex:'program_name', text:'Program' } );
+                        columns.push( {dataIndex:'project_name', text:'Project' } );
+                        
+                        for ( var i=this.pi_types.length; i>0; i-- ) {
+                            var sub_columns = [];
+                            var type = this.pi_types[i-1].get('ElementName');
+                            sub_columns.push({
+                                dataIndex:type + "_FormattedID",
+                                text: " id", width: 50,
+                                csvText: type + " id"
+                            });
+                            sub_columns.push({
+                                dataIndex:type + "_Name",
+                                text: "Name", width: 150,
+                                csvText: type + " Name"
+                            });
+                            Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                                sub_columns.push({
+                                    dataIndex:type + "_" +calculation_field,
+                                    text: calculation_header,
+                                    csvText: type + " " + calculation_header
+                                });
+                            });
+                            columns.push({ text: type, columns: sub_columns });
+                        }
+                        
+                        var story_columns = [
+                            {dataIndex:'FormattedID',text:'id', width: 50}, 
+                            {dataIndex:'Name',text:'Name',width: 200},
+                            {dataIndex:'Iteration',text:'Iteration',renderer: function(value){
+                                var display_value = "Backlog";
+                                if ( value ) { 
+                                    display_value = value.Name;
+                                }
+                                return display_value;
+                            },width: 200},
+                            {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
+                            {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
+                            {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
+                            {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                        ];
+                        
+                        var additional_story_fields = this.getSetting('additional_fields') || [];
+                        var additional_story_fields = this.getSetting('additional_fields') || [];
+                        if( typeof additional_story_fields === 'string' ) {
+                            additional_story_fields = additional_story_fields.split(',');
+                        }
+                        Ext.Array.each(additional_story_fields,function(additional_field){
+                            story_columns.push({
+                                dataIndex: additional_field,
+                                text: this._getDisplayFromFieldName(additional_field)
+                            });
+                        },this);
+                        
+                        Ext.Array.push(columns, [
+                            { 
+                                text: "Story", 
+                                columns: story_columns
+                            }
+                        ]);
+                        var grid = this.down('#display_box').add({
+                            xtype: 'rallygrid',
+                            store: store,
+                            sortableColumns: false,
+                            columnCfgs: columns
+                        });
+                        
+                        this._addButton(grid,shadow_store); 
+                        this.setLoading(false);
                     },
-                    failure: function(error_message){
+                    failure: function(error_message) {
                         this._showFailure(error_message);
                     }
                 });
             },
-            failure: function(msg) {
-                this._showFailure(msg);
+            failure: function(message) {
+                this._showFailure(message);
             }
         });
-        
-        
     },
     _showFailure: function(message) {
         alert(message);
@@ -180,11 +163,13 @@ Ext.define('CustomApp', {
             });
         }
     },
-    _addParentInformation: function(records,parent_field) {
+    _addParentInformation: function(stories) {
         var deferred = Ext.create('Deft.Deferred');
+        var app = Rally.getApp();
+        var parent_field = app.pi_types[0].get('ElementName');
         
         var parent_oids = [];
-        Ext.Array.each(records,function(record){ 
+        Ext.Array.each(stories,function(record){ 
             if ( record.get(parent_field)) {
                 var parent_oid = record.get(parent_field).ObjectID;
                 if ( parent_oid ) {
@@ -195,7 +180,7 @@ Ext.define('CustomApp', {
         
         var parent_type = 'PortfolioItem/' + parent_field;
         
-        this._loadItemsByObjectID(parent_oids,parent_type,[]).then({
+        app._loadItemsByObjectID(parent_oids,parent_type,[]).then({
             scope: this,
             success: function(parents){
                 var item_hash = {};
@@ -203,7 +188,7 @@ Ext.define('CustomApp', {
                     item_hash[parent.get('ObjectID')] = parent;
                 });
                 // calculate rollups for direct parents
-                Ext.Array.each(records,function(child) {
+                Ext.Array.each(stories,function(child) {
                     var parent_link = child.get(parent_field);
                     if ( parent_link ) {
                         var parent = item_hash[parent_link.ObjectID];
@@ -215,7 +200,7 @@ Ext.define('CustomApp', {
                     }
                 },this);
                 // cycle through parent types to roll up data
-                this.logger.log("pi types:", this.pi_types);
+
                 Ext.Array.each(this.pi_types, function(pi_type) {
                     this.logger.log('pi type:', pi_type);
                     Ext.Object.each(item_hash, function(key,child){
@@ -225,8 +210,6 @@ Ext.define('CustomApp', {
                             if ( parent_link ) {
                                 var parent = item_hash[parent_link.ObjectID];
                                 if ( parent ) {
-                                    this.logger.log('calc fields:',this.calculation_fields);
-                                    this.logger.log('parent: ', parent);
                                     Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                                         var parent_value = parent.get(calculation_field) || 0;
                                         var child_value = child.get(calculation_field) || 0;
@@ -235,9 +218,10 @@ Ext.define('CustomApp', {
                                 }
                             }
                         }
-                    },this);
-                },this);
-                deferred.resolve(item_hash);
+                    },app);
+                },app);
+                var records = app._consolidateParentInfoInStories(stories,item_hash);
+                deferred.resolve(records);
             },
             failure: function(error_message) {
                 deferred.reject(error_message);
@@ -278,7 +262,6 @@ Ext.define('CustomApp', {
         }).load().then({
                 scope: this,
                 success: function(records) {
-                    console.log("--", records);
                     var grand_parent_oids = [];
                     Ext.Array.each(records, function(record){
                         if ( record.get('Parent')) {
@@ -340,14 +323,60 @@ Ext.define('CustomApp', {
                     
         return deferred.promise;
     },
-    _loadStories: function(pi_field){
+    _loadPIsWithoutStories: function(){
         var deferred = Ext.create('Deft.Deferred');
+        var app = Rally.getApp();
+        var pi_field = app.pi_types[0].get('ElementName');
+        
+        var fetch = ['Name','ObjectID','FormattedID','TaskActualTotal',
+            'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
+            'Project','Workspace','Parent','Iteration'];
+
+        var store = Ext.create('Rally.data.wsapi.Store', {
+            fetch: fetch,
+            model: 'PortfolioItem/' + pi_field,
+            filters: [{
+                property: 'DirectChildrenCount',
+                value: 0
+            }],
+            limit: 'Infinity',
+            autoLoad: true,
+            listeners: {
+                load: function(store, records, successful) {
+                    if (successful){
+                        Ext.Array.each(records,function(record){
+                            record.set('Name',"No Story");
+                            record.set(pi_field,this.getData());
+                            record.set('FormattedID', '--');
+                            
+                            record.set('workspace_name', record.get('Workspace').Name);
+                            record.set('project_name', record.get('Project').Name);
+                            var program_name = '--';
+                            if ( record.get('Project').Parent) {
+                                record.set('program_name', record.get('Project').Parent.Name);
+                            }
+                        });
+                        deferred.resolve(records);
+                    } else {
+                        deferred.reject('Failed to load initial Snapshot Store');
+                    }
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    _loadStories: function(placeholder_stories){
+        var deferred = Ext.create('Deft.Deferred');
+        console.log("placeholder_stories", placeholder_stories);
+        
+        var app = Rally.getApp();
+        var pi_field = app.pi_types[0].get('ElementName');
         
         var fetch = ['Name','ObjectID','FormattedID','TaskActualTotal',
             'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
             'Project','Workspace','Parent','Iteration'];
         
-        var additional_story_fields = this.getSetting('additional_fields') || [];
+        var additional_story_fields = app.getSetting('additional_fields') || [];
         if( typeof additional_story_fields === 'string' ) {
             additional_story_fields = additional_story_fields.split(',');
         }
@@ -374,7 +403,9 @@ Ext.define('CustomApp', {
                                 record.set('program_name', record.get('Project').Parent.Name);
                             }
                         });
-                        deferred.resolve(records);
+                        
+                        var stories = Ext.Array.merge(records, placeholder_stories);
+                        deferred.resolve(stories);
                     } else {
                         deferred.reject('Failed to load initial Snapshot Store');
                     }
