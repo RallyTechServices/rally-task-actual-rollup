@@ -3,11 +3,11 @@
 <head>
     <title>Task Actual Rollup</title>
     <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Feb 14 2015 15:17:45 GMT-0800 (PST) -->
+    <!--  Build Date: Sat Feb 14 2015 18:58:51 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Feb 14 2015 15:17:45 GMT-0800 (PST)";
-        var CHECKSUM = 38872419071;
+        var APP_BUILD_DATE = "Sat Feb 14 2015 18:58:51 GMT-0800 (PST)";
+        var CHECKSUM = 44836645738;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -138,12 +138,6 @@ Ext.define('Rally.technicalservices.Logger',{
 
 });
 
-Ext.define('TSRow',{
-    fields: [
-        { name: 'FormattedID', type: 'String' },
-        { name: 'Name', type:'String' }
-    ]
-});
 /* Blob.js
  * A Blob implementation.
  * 2014-05-31
@@ -732,47 +726,69 @@ Ext.define('CustomApp', {
     _addParentInformation: function(stories) {
         var deferred = Ext.create('Deft.Deferred');
         var app = Rally.getApp();
-        var parent_field = app.pi_types[0].get('ElementName');
+        var parent_type = 'unset';
+        var parent_field = 'unset';
+        var parent_oids_by_type = {}; // key is type
         
         var parent_oids = [];
         Ext.Array.each(stories,function(record){ 
-            if ( record.get(parent_field)) {
-                var parent_oid = record.get(parent_field).ObjectID;
+            parent_type = app._getParentTypeFor(record.get('_type'));
+            var parent_field = parent_type.replace(/.*\//,"");
+            if ( ! parent_oids_by_type[parent_type] ) {
+                parent_oids_by_type[parent_type] = [];
+            }
+            
+            var parent = record.get(parent_field) || record.get('Parent');
+            
+            if ( parent ) {
+                var parent_oid = parent.ObjectID;
                 if ( parent_oid ) {
-                    parent_oids = Ext.Array.merge(parent_oids,[parent_oid]); 
+                    parent_oids_by_type[parent_type] = Ext.Array.merge(parent_oids_by_type[parent_type],[parent_oid]); 
                 }
             }
         });
         
-        var parent_type = 'PortfolioItem/' + parent_field;
+        var promises = [];
+        Ext.Object.each( parent_oids_by_type, function(type,oids) {
+            if ( oids.length > 0 ) {
+                promises.push( app._loadItemsByObjectID(oids,type,[]) );
+            }
+        });
         
-        app._loadItemsByObjectID(parent_oids,parent_type,[]).then({
+        Deft.Promise.all(promises).then({
             scope: this,
             success: function(parents){
                 var item_hash = {};
+                parents = Ext.Array.flatten(parents);
+
                 Ext.Array.each(parents, function(parent){
                     item_hash[parent.get('ObjectID')] = parent;
                 });
                 // calculate rollups for direct parents
                 Ext.Array.each(stories,function(child) {
+                    parent_type = app._getParentTypeFor(child.get('_type'));
+                    parent_field = parent_type.replace(/.*\//,"");
+            
                     var parent_link = child.get(parent_field);
+                    
                     if ( parent_link ) {
+                        
                         var parent = item_hash[parent_link.ObjectID];
-                        Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                        Ext.Object.each(app.calculation_fields,function(calculation_field,calculation_header){
                             var parent_value = parent.get(calculation_field) || 0;
                             var child_value = child.get(calculation_field) || 0;
+                            
                             parent.set(calculation_field,parent_value+child_value);
                         });
                     }
-                },this);
+                });
                 // cycle through parent types to roll up data
 
-                Ext.Array.each(this.pi_types, function(pi_type) {
-                    this.logger.log('pi type:', pi_type);
+                Ext.Array.each(app.pi_types, function(pi_type) {
                     Ext.Object.each(item_hash, function(key,child){
-                        this.logger.log('key,value', key, child);
                         if ( Ext.util.Format.lowercase(pi_type.get('TypePath') ) == child.get('_type') ){
                             var parent_link = child.get('Parent');
+
                             if ( parent_link ) {
                                 var parent = item_hash[parent_link.ObjectID];
                                 if ( parent ) {
@@ -795,18 +811,37 @@ Ext.define('CustomApp', {
         });
         return deferred.promise;
     },
-    _getParentTypeFor:function(type) {
-        var parent_type = null;
-        Ext.Array.each(this.pi_types,function(pi_type,idx) {
-            if ( type == pi_type.get('TypePath') ) {
-                parent_type = this.pi_types[idx+1].get('TypePath');
+    _getShortName:function(_type){
+        var app = Rally.getApp();
+        var short_name = "HierarchicalRequirement";
+        Ext.Array.each(app.pi_types,function(pi_type,idx) {
+            var lower_type = Ext.util.Format.lowercase(_type);
+            var lower_pi_type = Ext.util.Format.lowercase(pi_type.get('TypePath'));
+            
+            if ( lower_type == lower_pi_type ) {
+                short_name = pi_type.get('TypePath').replace(/.*\//,"");
             }
         },this);
+        return short_name;
+    },
+    _getParentTypeFor:function(type) {
+        var parent_type = null;
+        var lower_type = Ext.util.Format.lowercase(type);
+        if ( lower_type == "hierarchicalrequirement" ) {
+            parent_type = this.pi_types[0].get('TypePath');
+        } else {
+            Ext.Array.each(this.pi_types,function(pi_type,idx) {
+                var lower_pi_type = Ext.util.Format.lowercase(pi_type.get('TypePath'));
+    
+                if ( type == pi_type.get('TypePath') || lower_type == lower_pi_type) {
+                    parent_type = this.pi_types[idx+1].get('TypePath');
+                }
+            },this);
+        }
         return parent_type;
     },
     _loadItemsByObjectID:function(parent_oids,parent_type,children){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log("_loadItemsByObjectID",parent_type, parent_oids.length);
         
         var filters = Ext.create('Rally.data.wsapi.Filter',{property:'ObjectID',value:parent_oids[0]});
 
@@ -889,18 +924,20 @@ Ext.define('CustomApp', {
                     
         return deferred.promise;
     },
-    _loadPIsWithoutStories: function(){
+    /*
+     * have to load by type so we can get the parent field
+     * (if you do PortfolioItems straight, you don't get a parent)
+     */
+    _loadStorylessPIsByPIType: function(type_path) {
         var deferred = Ext.create('Deft.Deferred');
         var app = Rally.getApp();
-        var pi_field = app.pi_types[0].get('ElementName');
-        
-        var fetch = ['Name','ObjectID','FormattedID','TaskActualTotal',
-            'TaskEstimateTotal','PlanEstimate','TaskRemainingTotal',pi_field, 
-            'Project','Workspace','Parent','Iteration'];
+
+        var fetch = ['Name','ObjectID','FormattedID', 
+            'Project','Workspace','Parent'];
 
         var store = Ext.create('Rally.data.wsapi.Store', {
             fetch: fetch,
-            model: 'PortfolioItem/' + pi_field,
+            model: type_path,
             filters: [{
                 property: 'DirectChildrenCount',
                 value: 0
@@ -911,8 +948,13 @@ Ext.define('CustomApp', {
                 load: function(store, records, successful) {
                     if (successful){
                         Ext.Array.each(records,function(record){
+                            var short_type = app._getShortName(record.get('_type'));
+                            record.set(short_type + "_FormattedID",record.get('FormattedID'));
+                            record.set(short_type + "_ObjectID",record.get('ObjectID'));
+                            record.set(short_type + "_Name",record.get('Name'));
+                            
                             record.set('Name',"No Story");
-                            record.set(pi_field,this.getData());
+                            record.set(short_type,this.getData());
                             record.set('FormattedID', '--');
                             
                             record.set('workspace_name', record.get('Workspace').Name);
@@ -922,6 +964,7 @@ Ext.define('CustomApp', {
                                 record.set('program_name', record.get('Project').Parent.Name);
                             }
                         });
+
                         deferred.resolve(records);
                     } else {
                         deferred.reject('Failed to load initial Snapshot Store');
@@ -929,11 +972,32 @@ Ext.define('CustomApp', {
                 }
             }
         });
+        
+        return deferred;
+    },
+    _loadPIsWithoutStories: function(){
+        var deferred = Ext.create('Deft.Deferred');
+        var app = Rally.getApp();
+        var promises = [];
+        
+        Ext.Array.each( app.pi_types, function(pi_type){
+            promises.push(app._loadStorylessPIsByPIType(pi_type.get('TypePath')));
+        });
+        
+        Deft.Promise.all(promises).then({
+            success: function(results) {
+                deferred.resolve(Ext.Array.flatten(results));
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        
         return deferred.promise;
     },
+
     _loadStories: function(placeholder_stories){
-        var deferred = Ext.create('Deft.Deferred');
-        console.log("placeholder_stories", placeholder_stories);
+        var deferred = Ext.create('Deft.Deferred');        
         
         var app = Rally.getApp();
         var pi_field = app.pi_types[0].get('ElementName');
@@ -969,8 +1033,8 @@ Ext.define('CustomApp', {
                                 record.set('program_name', record.get('Project').Parent.Name);
                             }
                         });
-                        
-                        var stories = Ext.Array.merge(records, placeholder_stories);
+
+                        var stories = Ext.Array.push(records, placeholder_stories);
                         deferred.resolve(stories);
                     } else {
                         deferred.reject('Failed to load initial Snapshot Store');
@@ -984,59 +1048,95 @@ Ext.define('CustomApp', {
      * want to have a single record per line in the grid for each story, 
      * so tack on the parent-grandparent-etc data on the story record
      */
-    _consolidateParentInfoInStories: function(stories,parents){
-        this.logger.log("_consolidateParentInfoInStories");
+    _consolidateParentInfoInStories: function(rows,parents){
         var lowest_type = this.pi_types[0].get('ElementName');
         
-        Ext.Array.each(stories, function(story) {
-            this._setStoryFields(story);
+        Ext.Array.each(rows, function(row) {
+            this._initializeRowFields(row);
             
-            var parent_link = story.get(lowest_type);
+            var parent_field = lowest_type;
+            if ( row.get('_type') !== 'hierarchicalrequirement') {
+                parent_field = 'Parent';
+            }
+
+            var row_type = this._getShortName(row.get('_type'));
+            var parent_link = row.get(parent_field);
             if ( parent_link ) {
                 var parent_oid = parent_link.ObjectID;
-                var parent = parents[parent_oid];
-                story.set(lowest_type + "_FormattedID", parent.get('FormattedID'));
-                story.set(lowest_type + "_ObjectID", parent.get('ObjectID'));
-                story.set(lowest_type + "_Name", parent.get('Name'));
-                
-                Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                    var parent_value = parent.get(calculation_field) || 0;
-                    story.set(lowest_type + "_" + calculation_field,parent_value);
-                });
-                var last_parent = parent;
-                for ( var i=1; i<this.pi_types.length; i++ ) {
-                    var type = this.pi_types[i].get('ElementName');
-                    parent_link = last_parent.get('Parent');
-                    if ( parent_link ) {
-                        parent_oid = parent_link.ObjectID;
-                        parent = parents[parent_oid];
-                        if ( parent ) {
-                            story.set(type + "_FormattedID", parent.get('FormattedID'));
-                            story.set(type + "_ObjectID", parent.get('ObjectID'));
-                            story.set(type + "_Name", parent.get('Name'));
-                            
-                            Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
-                                var parent_value = parent.get(calculation_field) || 0;
-                                story.set(type + "_" + calculation_field,parent_value);
-                            });
-                        }
-                    }
-                    last_parent = parent;
+                                
+                for ( var i=0; i<this.pi_types.length+1; i++ ) {
+                   var parent = parents[parent_oid];
+                   if ( parent ) {
+                       var parent_type = this._getShortName(parent.get('_type'));
+                       row.set(parent_type + "_FormattedID", parent.get('FormattedID'));
+                       row.set(parent_type + "_ObjectID", parent.get('ObjectID'));
+                       row.set(parent_type + "_Name", parent.get('Name'));
+                    
+                       Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+                            var parent_value = parent.get(calculation_field) || 0;
+                            row.set(parent_type + "_" + calculation_field,parent_value);
+                       });
+                       var next_parent = parent.get('Parent');
+                       parent_oid = -1;
+                       if ( next_parent ) {
+                           parent_oid = next_parent.ObjectID;
+                       }
+                   }
+                   
                 }
             }
+
+//            if ( parent_link ) {
+//                var parent_oid = parent_link.ObjectID;
+//                var parent = parents[parent_oid];
+//                if ( parent ) {
+//                    story.set(lowest_type + "_FormattedID", parent.get('FormattedID'));
+//                    story.set(lowest_type + "_ObjectID", parent.get('ObjectID'));
+//                    story.set(lowest_type + "_Name", parent.get('Name'));
+//                
+//                    Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+//                        var parent_value = parent.get(calculation_field) || 0;
+//                        story.set(lowest_type + "_" + calculation_field,parent_value);
+//                    });
+//                }
+//                var last_parent = parent;
+                
+//                for ( var i=1; i<this.pi_types.length; i++ ) {
+//                    var type = this.pi_types[i].get('ElementName');
+//                    parent_link = last_parent.Parent || last_parent.get('Parent');
+//                    if ( parent_link ) {
+//                        parent_oid = parent_link.ObjectID;
+//                        parent = parents[parent_oid];
+//                        if ( parent ) {
+//                            story.set(type + "_FormattedID", parent.get('FormattedID'));
+//                            story.set(type + "_ObjectID", parent.get('ObjectID'));
+//                            story.set(type + "_Name", parent.get('Name'));
+//                            
+//                            Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
+//                                var parent_value = parent.get(calculation_field) || 0;
+//                                story.set(type + "_" + calculation_field,parent_value);
+//                            });
+//                        }
+//                    }
+//                    last_parent = parent;
+//                }
+//            }
         },this);
         
-        return stories;
+        return rows;
     },
     /*
      * Have to set the special fields on everything so that we have something to work with
      * in the custom store (it decides what the fields should be from the first object)
      */
-    _setStoryFields:function(story){
+    _initializeRowFields:function(story){
         for ( var i=0; i<this.pi_types.length; i++ ) {
             var type = this.pi_types[i].get('ElementName');
-            story.set(type + "_FormattedID","");
-            story.set(type + "_ObjectID","");
+            var field_name = type + "_FormattedID";
+            if ( ! story.get(field_name) ) {
+                story.set(type + "_FormattedID","");
+                story.set(type + "_ObjectID","");
+            }
             Ext.Object.each(this.calculation_fields,function(calculation_field,calculation_header){
                 story.set(type + "_" + calculation_field,"");
             });
@@ -1157,7 +1257,6 @@ Ext.define('CustomApp', {
     },
     //showSettings:  Override to add showing when external + scrolling
     showSettings: function(options) {
-        this.logger.log("showSettings",options);
         this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
             fields: this.getSettingsFields(),
             settings: this.getSettings(),
@@ -1180,7 +1279,6 @@ Ext.define('CustomApp', {
         return this._appSettings;
     },
     _onSettingsSaved: function(settings){
-        this.logger.log('_onSettingsSaved',settings);
         Ext.apply(this.settings, settings);
         this._hideSettings();
         this.onSettingsUpdate(settings);
@@ -1188,7 +1286,6 @@ Ext.define('CustomApp', {
     //onSettingsUpdate:  Override
     onSettingsUpdate: function (settings){
         //Build and save column settings...this means that we need to get the display names and multi-list
-        this.logger.log('onSettingsUpdate',settings);        
         this._recalculate();
     },
     isExternal: function(){
