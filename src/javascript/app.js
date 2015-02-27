@@ -79,19 +79,19 @@ Ext.define('CustomApp', {
                         }
                         
                         var story_columns = [
-                            {dataIndex:'FormattedID',text:'id', width: 50}, 
-                            {dataIndex:'Name',text:'Name',width: 200},
+                            {dataIndex:'FormattedID',text:'id', csvText:'Story ID', width: 50}, 
+                            {dataIndex:'Name',text:'Name', csvText:'Story Name',width: 200},
                             {dataIndex:'Iteration',text:'Iteration',renderer: function(value){
                                 var display_value = "Backlog";
                                 if ( value ) { 
                                     display_value = value.Name;
                                 }
                                 return display_value;
-                            },width: 200},
-                            {dataIndex: 'PlanEstimate', text:'Plan Estimate (Pts)'},
-                            {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours'},
-                            {dataIndex: 'TaskActualTotal', text:'Actual Hours'},
-                            {dataIndex: 'TaskRemainingTotal', text:'To Do'}
+                            }, csvText:'Story Iteration',width: 200},
+                            {dataIndex: 'PlanEstimate', csvText:'Story Plan Estimate (Pts)', text:'Plan Estimate (Pts)'},
+                            {dataIndex: 'TaskEstimateTotal', text:'Estimate Hours', csvText:'Story Estimate Hours'},
+                            {dataIndex: 'TaskActualTotal', text:'Actual Hours', csvText:'Story Actual Hours'},
+                            {dataIndex: 'TaskRemainingTotal', text:'To Do', csvText:'Story To Do'}
                         ];
                         
                         var additional_story_fields = this.getSetting('additional_fields') || [];
@@ -173,17 +173,20 @@ Ext.define('CustomApp', {
         var parent_oids = [];
         Ext.Array.each(stories,function(record){ 
             parent_type = app._getParentTypeFor(record.get('_type'));
-            var parent_field = parent_type.replace(/.*\//,"");
-            if ( ! parent_oids_by_type[parent_type] ) {
-                parent_oids_by_type[parent_type] = [];
-            }
-            
-            var parent = record.get(parent_field) || record.get('Parent');
-            
-            if ( parent ) {
-                var parent_oid = parent.ObjectID;
-                if ( parent_oid ) {
-                    parent_oids_by_type[parent_type] = Ext.Array.merge(parent_oids_by_type[parent_type],[parent_oid]); 
+            console.log(record.get('_type'), parent_type);
+            if ( parent_type ) {
+                var parent_field = parent_type.replace(/.*\//,"");
+                if ( ! parent_oids_by_type[parent_type] ) {
+                    parent_oids_by_type[parent_type] = [];
+                }
+                
+                var parent = record.get(parent_field) || record.get('Parent');
+                
+                if ( parent ) {
+                    var parent_oid = parent.ObjectID;
+                    if ( parent_oid ) {
+                        parent_oids_by_type[parent_type] = Ext.Array.merge(parent_oids_by_type[parent_type],[parent_oid]); 
+                    }
                 }
             }
         });
@@ -207,19 +210,21 @@ Ext.define('CustomApp', {
                 // calculate rollups for direct parents
                 Ext.Array.each(stories,function(child) {
                     parent_type = app._getParentTypeFor(child.get('_type'));
-                    parent_field = parent_type.replace(/.*\//,"");
-            
-                    var parent_link = child.get(parent_field);
-                    
-                    if ( parent_link ) {
+                    if ( parent_type ) {
+                        parent_field = parent_type.replace(/.*\//,"");
+                
+                        var parent_link = child.get(parent_field);
                         
-                        var parent = item_hash[parent_link.ObjectID];
-                        Ext.Object.each(app.calculation_fields,function(calculation_field,calculation_header){
-                            var parent_value = parent.get(calculation_field) || 0;
-                            var child_value = child.get(calculation_field) || 0;
+                        if ( parent_link ) {
                             
-                            parent.set(calculation_field,parent_value+child_value);
-                        });
+                            var parent = item_hash[parent_link.ObjectID];
+                            Ext.Object.each(app.calculation_fields,function(calculation_field,calculation_header){
+                                var parent_value = parent.get(calculation_field) || 0;
+                                var child_value = child.get(calculation_field) || 0;
+                                
+                                parent.set(calculation_field,parent_value+child_value);
+                            });
+                        }
                     }
                 });
                 // cycle through parent types to roll up data
@@ -266,17 +271,19 @@ Ext.define('CustomApp', {
     },
     _getParentTypeFor:function(type) {
         var parent_type = null;
-        var lower_type = Ext.util.Format.lowercase(type);
-        if ( lower_type == "hierarchicalrequirement" ) {
+        var lowercase_type = Ext.util.Format.lowercase(type);
+        if ( lowercase_type == "hierarchicalrequirement" ) {
             parent_type = this.pi_types[0].get('TypePath');
         } else {
-            Ext.Array.each(this.pi_types,function(pi_type,idx) {
-                var lower_pi_type = Ext.util.Format.lowercase(pi_type.get('TypePath'));
-    
-                if ( type == pi_type.get('TypePath') || lower_type == lower_pi_type) {
+            for ( var idx=0; idx< this.pi_types.length-1; idx++ ) {
+                var pi_type = this.pi_types[idx];
+
+                var lowercase_pi_type = Ext.util.Format.lowercase(pi_type.get('TypePath'));
+
+                if ( type == pi_type.get('TypePath') || lowercase_type == lowercase_pi_type) {
                     parent_type = this.pi_types[idx+1].get('TypePath');
                 }
-            },this);
+            }
         }
         return parent_type;
     },
