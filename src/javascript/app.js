@@ -173,7 +173,7 @@ Ext.define('CustomApp', {
         var parent_oids = [];
         Ext.Array.each(stories,function(record){ 
             parent_type = app._getParentTypeFor(record.get('_type'));
-            console.log(record.get('_type'), parent_type);
+            console.log(record.get('FormattedID'), record.get('_type'), parent_type );
             if ( parent_type ) {
                 var parent_field = parent_type.replace(/.*\//,"");
                 if ( ! parent_oids_by_type[parent_type] ) {
@@ -184,6 +184,7 @@ Ext.define('CustomApp', {
                 
                 if ( parent ) {
                     var parent_oid = parent.ObjectID;
+                    console.log('has parent:', parent_oid);
                     if ( parent_oid ) {
                         parent_oids_by_type[parent_type] = Ext.Array.merge(parent_oids_by_type[parent_type],[parent_oid]); 
                     }
@@ -191,8 +192,11 @@ Ext.define('CustomApp', {
             }
         });
         
+        console.log('--');
+        
         var promises = [];
         Ext.Object.each( parent_oids_by_type, function(type,oids) {
+            console.log("type/oids:",type,oids);
             if ( oids.length > 0 ) {
                 promises.push( app._loadItemsByObjectID(oids,type,[]) );
             }
@@ -202,6 +206,8 @@ Ext.define('CustomApp', {
             scope: this,
             success: function(parents){
                 var item_hash = {};
+                console.log("Got promises back", parents);
+                
                 parents = Ext.Array.flatten(parents);
 
                 Ext.Array.each(parents, function(parent){
@@ -218,12 +224,16 @@ Ext.define('CustomApp', {
                         if ( parent_link ) {
                             
                             var parent = item_hash[parent_link.ObjectID];
-                            Ext.Object.each(app.calculation_fields,function(calculation_field,calculation_header){
-                                var parent_value = parent.get(calculation_field) || 0;
-                                var child_value = child.get(calculation_field) || 0;
-                                
-                                parent.set(calculation_field,parent_value+child_value);
-                            });
+                            if ( parent ) {
+                                Ext.Object.each(app.calculation_fields,function(calculation_field,calculation_header){
+                                    var parent_value = parent.get(calculation_field) || 0;
+                                    var child_value = child.get(calculation_field) || 0;
+                                    
+                                    parent.set(calculation_field,parent_value+child_value);
+                                });
+                            } else {
+                                console.log("NO parent?", parent_link.ObjectID);
+                            }
                         }
                     }
                 });
