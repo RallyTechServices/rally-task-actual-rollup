@@ -5,7 +5,7 @@ Ext.define('CustomApp', {
     calculation_fields: { 'PlanEstimate': 'Plan Estimate', 'TaskActualTotal': 'Actual' ,'TaskEstimateTotal':'Estimate','TaskRemainingTotal':'To Do'},
     items: [
         {xtype:'container', defaults: { margin: 10 },itemId:'selector_box', layout: { type: 'hbox'} },
-        {xtype:'container',itemId:'display_box', margin: 10},
+        {xtype:'container',itemId:'display_box', margin: 10, layout: { type: 'fit' }},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
