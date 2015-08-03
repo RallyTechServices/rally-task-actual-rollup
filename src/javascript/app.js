@@ -316,11 +316,14 @@ Ext.define('CustomApp', {
             filters: filters,
             autoLoad: true,
             enablePostGet: true,
-            model: parent_type
+            model: parent_type,
+            limit: 'Infinity'
         }).load().then({
                 scope: this,
                 success: function(records) {
                     var grand_parent_oids = [];
+                    console.log("got back ", records.length, " items");
+                    
                     Ext.Array.each(records, function(record){
                         if ( record.get('Parent')) {
                             var grand_parent_oid = record.get('Parent').ObjectID;

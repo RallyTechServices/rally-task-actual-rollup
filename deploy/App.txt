@@ -3,11 +3,11 @@
 <head>
     <title>Task Actual Rollup</title>
     <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 09 2015 16:19:15 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 03 2015 13:32:15 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 09 2015 16:19:15 GMT-0700 (PDT)";
-        var CHECKSUM = 46387456815;
+        var APP_BUILD_DATE = "Mon Aug 03 2015 13:32:15 GMT-0700 (PDT)";
+        var CHECKSUM = 46569118160;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -876,11 +876,14 @@ Ext.define('CustomApp', {
             filters: filters,
             autoLoad: true,
             enablePostGet: true,
-            model: parent_type
+            model: parent_type,
+            limit: 'Infinity'
         }).load().then({
                 scope: this,
                 success: function(records) {
                     var grand_parent_oids = [];
+                    console.log("got back ", records.length, " items");
+                    
                     Ext.Array.each(records, function(record){
                         if ( record.get('Parent')) {
                             var grand_parent_oid = record.get('Parent').ObjectID;
